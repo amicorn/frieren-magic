@@ -2,21 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Archmage: Rune Manifestation</title>
+    <title>Frieren magic particle visualizations</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;900&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', sans-serif; }
-        #ui { position: absolute; top: 8%; width: 100%; text-align: center; color: #fff; pointer-events: none; z-index: 10; }
-        h1 { font-size: 3.5rem; margin: 0; letter-spacing: 12px; font-weight: 900; background: linear-gradient(to bottom, #fff, #444); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        #technique-name { font-size: 1.4rem; color: #00ffff; margin-top: 10px; font-weight: bold; letter-spacing: 5px; text-transform: uppercase; text-shadow: 0 0 15px rgba(0, 255, 255, 0.7); }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Cinzel', serif; }
+        
+        #ui { position: absolute; top: 5%; width: 100%; text-align: center; color: #fff; pointer-events: none; z-index: 10; }
+        h1 { 
+            font-size: 2.2rem; margin: 0; letter-spacing: 12px; font-weight: 900; 
+            background: linear-gradient(to bottom, #fdf5e6, #d4af37); 
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; 
+        }
+        #technique-name { 
+            font-size: 0.9rem; color: #d4af37; margin-top: 8px; font-weight: bold; 
+            letter-spacing: 4px; text-transform: uppercase; 
+        }
+
+        #mana-container {
+            position: absolute; top: 20%; right: 5%; width: 30px; height: 200px;
+            border: 2px solid rgba(212, 175, 55, 0.3); background: rgba(0,0,0,0.5); border-radius: 5px; overflow: hidden;
+        }
+        #mana-fill {
+            position: absolute; bottom: 0; width: 100%; height: 20%;
+            background: linear-gradient(to top, #d4af37, #fff);
+            box-shadow: 0 0 15px #d4af37; transition: height 0.3s ease;
+        }
 
         #video-container {
-            position: absolute; bottom: 3%; left: 18%; transform: translateX(-50%) scaleX(-1);
-            width: 80vw; max-width: 420px; height: 40vh; 
-            border: 4px solid; border-image: linear-gradient(45deg, #f06, #9f6, #06f, #f90) 1;
-            z-index: 20; background: #000; border-radius: 20px; overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,1);
+            position: absolute; bottom: 5%; left: 18%; transform: translateX(-50%) scaleX(-1);
+            width: 280px; height: 400px; 
+            border: 2px solid rgba(212, 175, 55, 0.5);
+            z-index: 20; background: #000; 
+            border-radius: 140px 140px 15px 15px; 
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(212, 175, 55, 0.15);
         }
-        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.7; }
+        video { width: 100%; height: 100%; object-fit: cover; opacity: 0.6; filter: sepia(0.3); }
         #output_canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
     </style>
     <script type="importmap">
@@ -28,9 +49,11 @@
 </head>
 <body>
     <div id="ui">
-        <h1>SUPREME MANA</h1>
-        <div id="technique-name">Ready to Cast...</div>
+        <!-- sousou no frieren japanese name -->
+        <h1>葬送のフリーレン</h1> 
+        <div id="technique-name">RESONATING MANA</div>
     </div>
+    <div id="mana-container"><div id="mana-fill"></div></div>
     <div id="video-container">
         <video class="input_video"></video>
         <canvas id="output_canvas"></canvas>
@@ -42,7 +65,7 @@
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-    // --- Scene Setup ---
+    // --- scene setup ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 60;
@@ -76,37 +99,34 @@
     }));
     scene.add(particles);
 
-    // --- Technique Patterns ---
-    const getIcePattern = (i) => {
-        const angle = (i / COUNT) * Math.PI * 100;
-        const radius = Math.sqrt(i / COUNT) * 45;
-        return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: Math.sin(i)*5, r: 0.5, g: 0.9, b: 1, s: 1.2 };
+    // --- Pattern Logic ---
+    const getFlamePattern = (i) => {
+        const t = i / COUNT;
+        const angle = t * Math.PI * 20;
+        const radius = 5 + t * 35;
+        return { x: Math.cos(angle) * radius, y: t * 100 - 50, z: Math.sin(angle) * radius, r: 1, g: 0.3, b: 0, s: 1.5 };
     };
 
     const getRunePattern = (i) => {
         const total = COUNT;
-        // 40% particles form the base floor (Mandala)
         if (i < total * 0.4) {
             const angle = (i / (total * 0.4)) * Math.PI * 2;
             const r = 30;
             return { x: Math.cos(angle) * r, y: -20, z: Math.sin(angle) * r, r: 1.0, g: 0.8, b: 0.2, s: 0.8 };
-        } 
-        // 40% particles form vertical Rune Pillars
-        else if (i < total * 0.8) {
+        } else if (i < total * 0.8) {
             const pillarIdx = i % 4;
             const offsets = [{x:15, z:15}, {x:-15, z:15}, {x:15, z:-15}, {x:-15, z:-15}];
             const h = (Math.random() - 0.5) * 60;
-            return { 
-                x: offsets[pillarIdx].x + (Math.random()-0.5)*2, 
-                y: h, 
-                z: offsets[pillarIdx].z + (Math.random()-0.5)*2, 
-                r: 1.0, g: 0.1, b: 0.5, s: 1.5 
-            };
-        } 
-        // 20% scattered magical dust
-        else {
+            return { x: offsets[pillarIdx].x + (Math.random()-0.5)*2, y: h, z: offsets[pillarIdx].z + (Math.random()-0.5)*2, r: 1.0, g: 0.1, b: 0.5, s: 1.5 };
+        } else {
             return { x: (Math.random()-0.5)*80, y: (Math.random()-0.5)*80, z: (Math.random()-0.5)*80, r: 1, g: 1, b: 1, s: 0.5 };
         }
+    };
+
+    const getIcePattern = (i) => {
+        const angle = (i / COUNT) * Math.PI * 100;
+        const radius = Math.sqrt(i / COUNT) * 45;
+        return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: Math.sin(i)*5, r: 0.5, g: 0.9, b: 1, s: 1.2 };
     };
 
     const getVoidPattern = (i) => {
@@ -115,16 +135,24 @@
         return { x: r * Math.cos(theta), y: r * Math.sin(theta), z: (Math.random()-0.5)*20, r: 0.6, g: 0, b: 1, s: 0.8 };
     };
 
-    // --- Hand Tracking ---
+    const getBurstPattern = (i) => {
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        const r = 50 + Math.random() * 30;
+        return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 1.0, g: 0.85, b: 0.4, s: 0.8 };
+    };
+
+    // --- Interaction & Tracking ---
     let currentTech = 'neutral';
     let handPos = { x: 0, y: 0 };
     let handVel = { x: 0, y: 0 };
     let lastHandPos = { x: 0, y: 0 };
-    let glowColor = '#00ffff';
+    let glowColor = '#d4af37';
 
     const videoElement = document.querySelector('.input_video');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
+    const manaFill = document.getElementById('mana-fill');
 
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
     hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7 });
@@ -142,22 +170,33 @@
             lastHandPos = { ...handPos };
 
             results.multiHandLandmarks.forEach(hand => {
+
+                // add glow effect to connector lines
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = glowColor;
+                // thicker trakcing lines for better visibility
                 drawConnectors(canvasCtx, hand, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
-                drawLandmarks(canvasCtx, hand, {color: '#fff', fillColor: glowColor, radius: 3});
+                
+                // make joints more visible with glow
+                drawLandmarks(canvasCtx, hand, {color: '#fff', lineWidth: 2, radius: 3});
             });
 
-            // TEEPEE/RUNE GESTURE LOGIC (Index tips close to each other)
             if (results.multiHandLandmarks.length === 2) {
                 const h1 = results.multiHandLandmarks[0];
                 const h2 = results.multiHandLandmarks[1];
                 const dist = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y);
+                const spread = Math.hypot(h1[0].x - h2[0].x);
+
                 if (dist < 0.1) detected = 'rune';
+                else if (spread > 0.4) detected = 'burst';
             }
 
             if (detected === 'neutral') {
                 const isUp = (t, p) => lm[t].y < lm[p].y;
                 const upCount = [8,12,16,20].filter(i => isUp(i, i-2)).length;
-                if (upCount === 4) detected = 'ice';
+                
+                if (upCount === 1) detected = 'flame';
+                else if (upCount === 4) detected = 'ice';
                 else if (upCount === 0) detected = 'void';
             }
         }
@@ -169,16 +208,20 @@
         currentTech = tech;
         const nameEl = document.getElementById('technique-name');
 
-        if(tech === 'rune') { glowColor = '#ff0077'; nameEl.innerText = "ELDRITCH RUNE-GATE"; bloomPass.strength = 3.5; }
-        else if(tech === 'ice') { glowColor = '#00f2ff'; nameEl.innerText = "CRYSTALLINE FRACTURE"; bloomPass.strength = 2.0; }
-        else if(tech === 'void') { glowColor = '#aa00ff'; nameEl.innerText = "ABYSSAL REACH"; bloomPass.strength = 2.5; }
-        else { glowColor = '#00ffff'; nameEl.innerText = "Neutralizing..."; bloomPass.strength = 1.0; }
+        if(tech === 'rune') { glowColor = '#ff0077'; nameEl.innerText = "ELDRITCH RUNE-GATE"; bloomPass.strength = 2.5; manaFill.style.height = "95%"; }
+        else if(tech === 'flame') { glowColor = '#ff4400'; nameEl.innerText = "SOLAR ERUPTION"; bloomPass.strength = 3.0; manaFill.style.height = "75%"; }
+        else if(tech === 'burst') { glowColor = '#fff700'; nameEl.innerText = "FIELD OF LIGHT"; bloomPass.strength = 3.5; manaFill.style.height = "100%"; }
+        else if(tech === 'ice') { glowColor = '#00f2ff'; nameEl.innerText = "CRYSTALLINE FRACTURE"; bloomPass.strength = 2.0; manaFill.style.height = "60%"; }
+        else if(tech === 'void') { glowColor = '#aa00ff'; nameEl.innerText = "ABYSSAL REACH"; bloomPass.strength = 2.5; manaFill.style.height = "40%"; }
+        else { glowColor = '#d4af37'; nameEl.innerText = "SENSING MANA..."; bloomPass.strength = 1.0; manaFill.style.height = "20%"; }
 
         for(let i=0; i<COUNT; i++) {
             let p;
             if(tech === 'rune') p = getRunePattern(i);
+            else if(tech === 'flame') p = getFlamePattern(i);
             else if(tech === 'ice') p = getIcePattern(i);
             else if(tech === 'void') p = getVoidPattern(i);
+            else if(tech === 'burst') p = getBurstPattern(i);
             else p = { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10, z: (Math.random()-0.5)*10, r:0.2, g:0.5, b:0.5, s:0.3 };
             
             targetPositions[i*3] = p.x; targetPositions[i*3+1] = p.y; targetPositions[i*3+2] = p.z;
@@ -200,25 +243,29 @@
         requestAnimationFrame(animate);
         const pos = particles.geometry.attributes.position.array;
         const col = particles.geometry.attributes.color.array;
+        const siz = particles.geometry.attributes.size.array;
 
         particles.position.x += (handPos.x - particles.position.x) * 0.1;
         particles.position.y += (handPos.y - particles.position.y) * 0.1;
         
         if (currentTech === 'rune') {
-            particles.rotation.y += 0.02; // Rotate the gateway
-            particles.rotation.x = 0; // Keep it upright
+            particles.rotation.y += 0.015; 
         } else {
             particles.rotation.y += handVel.x * 0.05 + 0.005;
             particles.rotation.x -= handVel.y * 0.05;
         }
 
         for(let i=0; i<COUNT*3; i++) {
-            pos[i] += (targetPositions[i] - pos[i]) * 0.08;
+            pos[i] += (targetPositions[i] - pos[i]) * 0.1;
             col[i] += (targetColors[i] - col[i]) * 0.1;
+        }
+        for(let i=0; i<COUNT; i++) {
+            siz[i] += (targetSizes[i] - siz[i]) * 0.1;
         }
 
         particles.geometry.attributes.position.needsUpdate = true;
         particles.geometry.attributes.color.needsUpdate = true;
+        particles.geometry.attributes.size.needsUpdate = true;
         composer.render();
     }
     animate();

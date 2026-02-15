@@ -59,13 +59,14 @@
         <canvas id="output_canvas"></canvas>
     </div>
 
+
 <script type="module">
     import * as THREE from 'three';
     import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
     import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
     import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-    // --- scene setup ---
+    // --- Scene Setup ---
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
     camera.position.z = 60;
@@ -100,11 +101,26 @@
     scene.add(particles);
 
     // --- Pattern Logic ---
+const getHeartPattern = (i) => {
+        const t = (i / COUNT) * Math.PI * 2;
+        // Standard Heart Math
+        const x = 16 * Math.pow(Math.sin(t), 3);
+        // We use a positive Y calculation but apply a final negative to 
+        // the output to ensure it stays oriented to your "up" direction.
+        const yBase = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+        
+        return { 
+            x: x * 1.5, 
+            y: -yBase * 1.5, // The negative here flips it right-side up
+            z: (Math.random() - 0.5) * 10, 
+            r: 1, g: 0.2, b: 0.6, s: 1.2 
+        };
+    };
     const getFlamePattern = (i) => {
         const t = i / COUNT;
         const angle = t * Math.PI * 20;
         const radius = 5 + t * 35;
-        return { x: Math.cos(angle) * radius, y: t * 100 - 50, z: Math.sin(angle) * radius, r: 1, g: 0.3, b: 0, s: 1.5 };
+        return { x: Math.cos(angle) * radius, y: t * -100 + 50, z: Math.sin(angle) * radius, r: 1, g: 0.3, b: 0, s: 1.5 };
     };
 
     const getRunePattern = (i) => {
@@ -112,12 +128,12 @@
         if (i < total * 0.4) {
             const angle = (i / (total * 0.4)) * Math.PI * 2;
             const r = 30;
-            return { x: Math.cos(angle) * r, y: -20, z: Math.sin(angle) * r, r: 1.0, g: 0.8, b: 0.2, s: 0.8 };
+            return { x: Math.cos(angle) * r, y: 20, z: Math.sin(angle) * r, r: 1.0, g: 0.8, b: 0.2, s: 0.8 };
         } else if (i < total * 0.8) {
             const pillarIdx = i % 4;
             const offsets = [{x:15, z:15}, {x:-15, z:15}, {x:15, z:-15}, {x:-15, z:-15}];
             const h = (Math.random() - 0.5) * 60;
-            return { x: offsets[pillarIdx].x + (Math.random()-0.5)*2, y: h, z: offsets[pillarIdx].z + (Math.random()-0.5)*2, r: 1.0, g: 0.1, b: 0.5, s: 1.5 };
+            return { x: offsets[pillarIdx].x + (Math.random()-0.5)*2, y: -h, z: offsets[pillarIdx].z + (Math.random()-0.5)*2, r: 1.0, g: 0.1, b: 0.5, s: 1.5 };
         } else {
             return { x: (Math.random()-0.5)*80, y: (Math.random()-0.5)*80, z: (Math.random()-0.5)*80, r: 1, g: 1, b: 1, s: 0.5 };
         }
@@ -142,11 +158,11 @@
         return { x: r * Math.sin(phi) * Math.cos(theta), y: r * Math.sin(phi) * Math.sin(theta), z: r * Math.cos(phi), r: 1.0, g: 0.85, b: 0.4, s: 0.8 };
     };
 
-    // --- Interaction & Tracking ---
+    // --- State & Hand Tracking ---
     let currentTech = 'neutral';
     let handPos = { x: 0, y: 0 };
-    let handVel = { x: 0, y: 0 };
     let lastHandPos = { x: 0, y: 0 };
+    let handVel = { x: 0, y: 0 };
     let glowColor = '#d4af37';
 
     const videoElement = document.querySelector('.input_video');
@@ -162,43 +178,49 @@
         let detected = 'neutral';
 
         if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            const lm = results.multiHandLandmarks[0];
-            handPos.x = (0.5 - lm[9].x) * 80;
-            handPos.y = (0.5 - lm[9].y) * 60;
+            const h1 = results.multiHandLandmarks[0];
+            
+            handPos.x = (0.5 - h1[9].x) * 100;
+            handPos.y = (0.5 - h1[9].y) * 80;
+            
             handVel.x = handPos.x - lastHandPos.x;
             handVel.y = handPos.y - lastHandPos.y;
             lastHandPos = { ...handPos };
 
-            results.multiHandLandmarks.forEach(hand => {
-
-                // add glow effect to connector lines
-                canvasCtx.shadowBlur = 15;
-                canvasCtx.shadowColor = glowColor;
-                // thicker trakcing lines for better visibility
-                drawConnectors(canvasCtx, hand, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
-                
-                // make joints more visible with glow
-                drawLandmarks(canvasCtx, hand, {color: '#fff', lineWidth: 2, radius: 3});
-            });
-
+            // 1. Two-Hand Gestures
             if (results.multiHandLandmarks.length === 2) {
-                const h1 = results.multiHandLandmarks[0];
                 const h2 = results.multiHandLandmarks[1];
                 const dist = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y);
                 const spread = Math.hypot(h1[0].x - h2[0].x);
-
                 if (dist < 0.1) detected = 'rune';
                 else if (spread > 0.4) detected = 'burst';
             }
 
+            // 2. Single-Hand Gestures & Heart Detection
             if (detected === 'neutral') {
-                const isUp = (t, p) => lm[t].y < lm[p].y;
-                const upCount = [8,12,16,20].filter(i => isUp(i, i-2)).length;
+                const thumbTip = h1[4];
+                const indexTip = h1[8];
+                const heartDist = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
                 
-                if (upCount === 1) detected = 'flame';
-                else if (upCount === 4) detected = 'ice';
-                else if (upCount === 0) detected = 'void';
+                // Finger Heart Logic (Thumb and Index touching, others curled)
+                if (heartDist < 0.04) {
+                    detected = 'heart';
+                } else {
+                    const isUp = (t, p) => h1[t].y < h1[p].y;
+                    const upCount = [8, 12, 16, 20].filter(i => isUp(i, i - 2)).length;
+                    if (upCount === 1) detected = 'flame';
+                    else if (upCount === 4) detected = 'ice';
+                    else if (upCount === 0) detected = 'void';
+                }
             }
+
+            results.multiHandLandmarks.forEach(hand => {
+                canvasCtx.shadowBlur = 15;
+                canvasCtx.shadowColor = glowColor;
+                drawConnectors(canvasCtx, hand, HAND_CONNECTIONS, {color: glowColor, lineWidth: 4});
+                drawLandmarks(canvasCtx, hand, {color: '#fff', lineWidth: 1, radius: 2});
+                canvasCtx.shadowBlur = 0;
+            });
         }
         updateState(detected);
     });
@@ -208,7 +230,8 @@
         currentTech = tech;
         const nameEl = document.getElementById('technique-name');
 
-        if(tech === 'rune') { glowColor = '#ff0077'; nameEl.innerText = "ELDRITCH RUNE-GATE"; bloomPass.strength = 2.5; manaFill.style.height = "95%"; }
+        if(tech === 'heart') { glowColor = '#ff69b4'; nameEl.innerText = "AFFECTIONATE MANA"; bloomPass.strength = 3.0; manaFill.style.height = "80%"; }
+        else if(tech === 'rune') { glowColor = '#ff0077'; nameEl.innerText = "ELDRITCH RUNE-GATE"; bloomPass.strength = 2.5; manaFill.style.height = "95%"; }
         else if(tech === 'flame') { glowColor = '#ff4400'; nameEl.innerText = "SOLAR ERUPTION"; bloomPass.strength = 3.0; manaFill.style.height = "75%"; }
         else if(tech === 'burst') { glowColor = '#fff700'; nameEl.innerText = "FIELD OF LIGHT"; bloomPass.strength = 3.5; manaFill.style.height = "100%"; }
         else if(tech === 'ice') { glowColor = '#00f2ff'; nameEl.innerText = "CRYSTALLINE FRACTURE"; bloomPass.strength = 2.0; manaFill.style.height = "60%"; }
@@ -217,7 +240,8 @@
 
         for(let i=0; i<COUNT; i++) {
             let p;
-            if(tech === 'rune') p = getRunePattern(i);
+            if(tech === 'heart') p = getHeartPattern(i);
+            else if(tech === 'rune') p = getRunePattern(i);
             else if(tech === 'flame') p = getFlamePattern(i);
             else if(tech === 'ice') p = getIcePattern(i);
             else if(tech === 'void') p = getVoidPattern(i);
@@ -230,6 +254,7 @@
         }
     }
 
+    // --- Camera & Animation (Rest of your original code remains here) ---
     const cameraUtils = new Camera(videoElement, {
         onFrame: async () => {
             canvasElement.width = videoElement.videoWidth;
@@ -250,6 +275,8 @@
         
         if (currentTech === 'rune') {
             particles.rotation.y += 0.015; 
+        } else if (currentTech === 'heart') {
+            particles.rotation.z = Math.sin(Date.now() * 0.002) * 0.1; // Slight heart throb tilt
         } else {
             particles.rotation.y += handVel.x * 0.05 + 0.005;
             particles.rotation.x -= handVel.y * 0.05;
@@ -269,6 +296,13 @@
         composer.render();
     }
     animate();
+
+    window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+    });
 </script>
 </body>
 </html>

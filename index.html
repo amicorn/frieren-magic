@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Archmage: 50k Particle Manifestation</title>
+    <title>Archmage: Rune Manifestation</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Courier New', sans-serif; }
         #ui { position: absolute; top: 8%; width: 100%; text-align: center; color: #fff; pointer-events: none; z-index: 10; }
@@ -76,18 +76,37 @@
     }));
     scene.add(particles);
 
-    // --- Complex Pattern Functions ---
+    // --- Technique Patterns ---
     const getIcePattern = (i) => {
         const angle = (i / COUNT) * Math.PI * 100;
         const radius = Math.sqrt(i / COUNT) * 45;
         return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius, z: Math.sin(i)*5, r: 0.5, g: 0.9, b: 1, s: 1.2 };
     };
 
-    const getFlamePattern = (i) => {
-        const t = i / COUNT;
-        const angle = t * Math.PI * 20;
-        const radius = 5 + t * 35;
-        return { x: Math.cos(angle) * radius, y: t * 100 - 50, z: Math.sin(angle) * radius, r: 1, g: 0.3, b: 0, s: 1.5 };
+    const getRunePattern = (i) => {
+        const total = COUNT;
+        // 40% particles form the base floor (Mandala)
+        if (i < total * 0.4) {
+            const angle = (i / (total * 0.4)) * Math.PI * 2;
+            const r = 30;
+            return { x: Math.cos(angle) * r, y: -20, z: Math.sin(angle) * r, r: 1.0, g: 0.8, b: 0.2, s: 0.8 };
+        } 
+        // 40% particles form vertical Rune Pillars
+        else if (i < total * 0.8) {
+            const pillarIdx = i % 4;
+            const offsets = [{x:15, z:15}, {x:-15, z:15}, {x:15, z:-15}, {x:-15, z:-15}];
+            const h = (Math.random() - 0.5) * 60;
+            return { 
+                x: offsets[pillarIdx].x + (Math.random()-0.5)*2, 
+                y: h, 
+                z: offsets[pillarIdx].z + (Math.random()-0.5)*2, 
+                r: 1.0, g: 0.1, b: 0.5, s: 1.5 
+            };
+        } 
+        // 20% scattered magical dust
+        else {
+            return { x: (Math.random()-0.5)*80, y: (Math.random()-0.5)*80, z: (Math.random()-0.5)*80, r: 1, g: 1, b: 1, s: 0.5 };
+        }
     };
 
     const getVoidPattern = (i) => {
@@ -108,33 +127,39 @@
     const canvasCtx = canvasElement.getContext('2d');
 
     const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-    hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7 });
+    hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: 0.7 });
 
     hands.onResults((results) => {
         canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
         let detected = 'neutral';
 
-        if (results.multiHandLandmarks && results.multiHandLandmarks[0]) {
+        if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
             const lm = results.multiHandLandmarks[0];
-            
-            // Track movement
             handPos.x = (0.5 - lm[9].x) * 80;
             handPos.y = (0.5 - lm[9].y) * 60;
             handVel.x = handPos.x - lastHandPos.x;
             handVel.y = handPos.y - lastHandPos.y;
             lastHandPos = { ...handPos };
 
-            // Draw high-quality joints
-            drawConnectors(canvasCtx, lm, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
-            drawLandmarks(canvasCtx, lm, {color: '#fff', fillColor: glowColor, radius: 3});
+            results.multiHandLandmarks.forEach(hand => {
+                drawConnectors(canvasCtx, hand, HAND_CONNECTIONS, {color: glowColor, lineWidth: 5});
+                drawLandmarks(canvasCtx, hand, {color: '#fff', fillColor: glowColor, radius: 3});
+            });
 
-            // Gesture logic
-            const isUp = (t, p) => lm[t].y < lm[p].y;
-            const upCount = [8,12,16,20].filter(i => isUp(i, i-2)).length;
-            
-            if (upCount === 4) detected = 'ice';
-            else if (upCount === 1) detected = 'flame';
-            else if (upCount === 0) detected = 'void';
+            // TEEPEE/RUNE GESTURE LOGIC (Index tips close to each other)
+            if (results.multiHandLandmarks.length === 2) {
+                const h1 = results.multiHandLandmarks[0];
+                const h2 = results.multiHandLandmarks[1];
+                const dist = Math.hypot(h1[8].x - h2[8].x, h1[8].y - h2[8].y);
+                if (dist < 0.1) detected = 'rune';
+            }
+
+            if (detected === 'neutral') {
+                const isUp = (t, p) => lm[t].y < lm[p].y;
+                const upCount = [8,12,16,20].filter(i => isUp(i, i-2)).length;
+                if (upCount === 4) detected = 'ice';
+                else if (upCount === 0) detected = 'void';
+            }
         }
         updateState(detected);
     });
@@ -144,15 +169,15 @@
         currentTech = tech;
         const nameEl = document.getElementById('technique-name');
 
-        if(tech === 'ice') { glowColor = '#00f2ff'; nameEl.innerText = "CRYSTALLINE FRACTURE"; bloomPass.strength = 2.0; }
-        else if(tech === 'flame') { glowColor = '#ff4400'; nameEl.innerText = "SOLAR ERUPTION"; bloomPass.strength = 3.0; }
+        if(tech === 'rune') { glowColor = '#ff0077'; nameEl.innerText = "ELDRITCH RUNE-GATE"; bloomPass.strength = 3.5; }
+        else if(tech === 'ice') { glowColor = '#00f2ff'; nameEl.innerText = "CRYSTALLINE FRACTURE"; bloomPass.strength = 2.0; }
         else if(tech === 'void') { glowColor = '#aa00ff'; nameEl.innerText = "ABYSSAL REACH"; bloomPass.strength = 2.5; }
         else { glowColor = '#00ffff'; nameEl.innerText = "Neutralizing..."; bloomPass.strength = 1.0; }
 
         for(let i=0; i<COUNT; i++) {
             let p;
-            if(tech === 'ice') p = getIcePattern(i);
-            else if(tech === 'flame') p = getFlamePattern(i);
+            if(tech === 'rune') p = getRunePattern(i);
+            else if(tech === 'ice') p = getIcePattern(i);
             else if(tech === 'void') p = getVoidPattern(i);
             else p = { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10, z: (Math.random()-0.5)*10, r:0.2, g:0.5, b:0.5, s:0.3 };
             
@@ -173,17 +198,19 @@
 
     function animate() {
         requestAnimationFrame(animate);
-        
         const pos = particles.geometry.attributes.position.array;
         const col = particles.geometry.attributes.color.array;
 
-        // The Elsa Secret: Apply hand velocity directly to the scene rotation and position
         particles.position.x += (handPos.x - particles.position.x) * 0.1;
         particles.position.y += (handPos.y - particles.position.y) * 0.1;
         
-        // Tilt the magic based on movement speed
-        particles.rotation.y += handVel.x * 0.05 + 0.005;
-        particles.rotation.x -= handVel.y * 0.05;
+        if (currentTech === 'rune') {
+            particles.rotation.y += 0.02; // Rotate the gateway
+            particles.rotation.x = 0; // Keep it upright
+        } else {
+            particles.rotation.y += handVel.x * 0.05 + 0.005;
+            particles.rotation.x -= handVel.y * 0.05;
+        }
 
         for(let i=0; i<COUNT*3; i++) {
             pos[i] += (targetPositions[i] - pos[i]) * 0.08;
@@ -195,13 +222,6 @@
         composer.render();
     }
     animate();
-
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        composer.setSize(window.innerWidth, window.innerHeight);
-    });
 </script>
 </body>
 </html>

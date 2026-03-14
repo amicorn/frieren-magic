@@ -6,7 +6,7 @@ An immersive, real-time Computer Vision application that allows users to manifes
 
 I love this anime, highly recommend to anyone interested in the philosophy of life and what truly matters from the perspective of an immortal. And anyone who likes art, fantasy, and ethereal, Celtic folk music.
 
-**Website: amicorn.github.io/frieren-magic/**
+**Website: https://amicorn.github.io/frieren-magic/**
 
 ## ✨ Features
 

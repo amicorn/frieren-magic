@@ -8,6 +8,8 @@ I love this anime, highly recommend to anyone interested in the philosophy of li
 
 **Website: https://amicorn.github.io/frieren-magic/**
 
+[Demo video of all spells to Frieren OST](https://www.instagram.com/reel/DU3seqcEsT2/)
+
 ## ✨ Features
 
 * **Real-time Gesture Recognition:** Leverages MediaPipe to detect finger counts, palm spread, and specific hand shapes.
